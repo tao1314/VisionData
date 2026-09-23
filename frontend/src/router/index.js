@@ -18,12 +18,6 @@ const routes = [
         name: 'Tasks',
         component: () => import('@/views/tasks/index.vue'),
         meta: { title: '任务记录', icon: 'Tickets' }
-      },
-      {
-        path: 'about',
-        name: 'About',
-        component: () => import('@/views/about/index.vue'),
-        meta: { title: '关于项目', icon: 'InfoFilled' }
       }
     ]
   },

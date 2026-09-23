@@ -1,101 +1,216 @@
 <template>
-  <section class="page recognition-page">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">IMAGE TO DATA</p>
-        <h1>图片识别转数据</h1>
-        <p>导入图片，执行识别并校对结构化结果。</p>
-      </div>
-      <div class="heading-actions">
-        <el-button @click="resetWorkspace">清空</el-button>
-        <el-button type="primary" :loading="recognizing" :disabled="!images.length" @click="runRecognition">
-          开始识别
-        </el-button>
-      </div>
-    </div>
+  <section class="recognition-workbench">
+    <aside class="result-pane">
+      <CurvePanel
+        class="result-pane__content"
+        :curves="curves"
+        :active-id="activeCurveId"
+        @add="addCurve"
+        @remove="removeCurve"
+        @select="selectCurve"
+        @update="updateCurve"
+        @tool="activateTool"
+      />
+      <footer class="result-actions">
+        <div><strong>{{ dataRows.length }}</strong><span>数据点</span></div>
+        <el-button :disabled="!dataRows.length" @click="previewVisible = true"><View />查看数据</el-button>
+        <el-button type="primary" :disabled="!dataRows.length" @click="exportXlsx"><Download />导出数据</el-button>
+      </footer>
+    </aside>
 
-    <el-row :gutter="18">
-      <el-col :span="9">
-        <el-card class="workspace-card" shadow="never">
-          <template #header>
-            <div class="card-header"><strong>图片队列</strong><el-tag>{{ images.length }} 张</el-tag></div>
-          </template>
-          <button class="drop-zone" @click="selectImages">
-            <el-icon :size="34"><UploadFilled /></el-icon>
-            <strong>选择图片</strong>
-            <span>支持 PNG、JPG、BMP、WebP、TIFF，可多选</span>
-          </button>
-          <div v-if="images.length" class="image-list">
-            <div v-for="image in images" :key="image.path" class="image-item">
-              <el-icon><Picture /></el-icon>
-              <div><strong>{{ image.name }}</strong><span>{{ image.path }}</span></div>
-              <el-tag size="small" type="info">待识别</el-tag>
-            </div>
-          </div>
-          <el-empty v-else description="尚未导入图片" :image-size="84" />
-        </el-card>
-      </el-col>
+    <main class="image-pane">
+      <header class="image-toolbar">
+        <div class="tool-group">
+          <el-select v-if="images.length" v-model="activeImageIndex" class="image-selector">
+            <el-option v-for="(image, index) in images" :key="image.path" :label="image.name" :value="index" />
+          </el-select>
+        </div>
+        <div class="tool-group tool-group--modes">
+          <el-tooltip content="拖动矩形区域自动提取曲线" placement="bottom">
+            <el-button :type="activeTool === 'box' ? 'primary' : ''" :icon="Crop" @click="activateTool('box')">框选</el-button>
+          </el-tooltip>
+          <el-tooltip content="沿曲线拖动，指针将吸附到附近边缘" placement="bottom">
+            <el-button :type="activeTool === 'trace' ? 'primary' : ''" :icon="EditPen" @click="activateTool('trace')">吸附描线</el-button>
+          </el-tooltip>
+          <el-tooltip content="标定 X 轴最小值到最大值的位置" placement="bottom">
+            <el-button :type="activeTool === 'x-axis' ? 'primary' : ''" @click="activateTool('x-axis')">标注 X 轴</el-button>
+          </el-tooltip>
+          <el-tooltip content="标定 Y 轴最小值到最大值的位置" placement="bottom">
+            <el-button :type="activeTool === 'y-axis' ? 'primary' : ''" @click="activateTool('y-axis')">标注 Y 轴</el-button>
+          </el-tooltip>
+        </div>
+        <div class="tool-group tool-group--right">
+          <el-button :icon="RefreshLeft" :disabled="!history.length" @click="undo">撤销</el-button>
+          <el-button :icon="Delete" @click="clearActiveCurve">清除选取</el-button>
+          <el-button type="primary" :icon="Upload" @click="selectImages">导入图片</el-button>
+        </div>
+      </header>
 
-      <el-col :span="15">
-        <el-card class="workspace-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <strong>结构化结果</strong>
-              <span class="muted">{{ taskStatus }}</span>
-            </div>
-          </template>
-          <el-table v-if="resultRows.length" :data="resultRows" height="520" border>
-            <el-table-column type="index" width="58" label="#" />
-            <el-table-column v-for="column in resultColumns" :key="column" :prop="column" :label="column" min-width="140" />
-          </el-table>
-          <el-empty v-else description="识别结果将在这里展示" :image-size="118">
-            <el-button type="primary" plain @click="selectImages">导入第一张图片</el-button>
-          </el-empty>
-        </el-card>
-      </el-col>
-    </el-row>
+      <ImageWorkspace
+        :image="activeImage"
+        :curves="curves"
+        :active-id="activeCurveId"
+        :tool="activeTool"
+        @curve-change="updateCurve"
+        @tool-complete="activateTool"
+      />
+    </main>
+
+    <DataPreviewDialog v-model="previewVisible" :rows="dataRows" @export="exportXlsx" />
   </section>
 </template>
 
 <script setup>
+/** 图片取数工作台，负责数据线状态编排、坐标换算与结果导出。 */
 import { computed, ref } from 'vue';
+import { Crop, Delete, Download, EditPen, RefreshLeft, Upload, View } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import * as XLSX from 'xlsx';
 import { useStore } from 'vuex';
+import CurvePanel from '@/components/recognition/CurvePanel.vue';
+import DataPreviewDialog from '@/components/recognition/DataPreviewDialog.vue';
+import ImageWorkspace from '@/components/recognition/ImageWorkspace.vue';
 import { recognitionApi } from '@/api/electron';
 
 const store = useStore();
-const recognizing = ref(false);
+const activeImageIndex = ref(0);
+const activeCurveId = ref(1);
+const activeTool = ref('box');
+const previewVisible = ref(false);
+const history = ref([]);
+const curves = ref([createCurve(1, 1)]);
 const images = computed(() => store.state.recognition.images);
-const resultRows = computed(() => store.state.recognition.resultRows);
-const resultColumns = computed(() => Object.keys(resultRows.value[0] || {}));
-const taskStatus = computed(() => store.state.recognition.currentTask?.message || '等待识别任务');
+const activeImage = computed(() => images.value[activeImageIndex.value] || null);
+const activeCurve = computed(() => curves.value.find((curve) => curve.id === activeCurveId.value));
+const dataRows = computed(() => curves.value.flatMap((curve) => curve.points.map((point) => mapPoint(curve, point))));
 
-/** 从系统文件选择器导入图片。 */
+/** 创建一条包含默认轴范围的空数据线。 */
+function createCurve(id, sequence) {
+  const colors = ['#3976e6', '#ef6c35', '#12a875', '#9b59d0', '#d9a21b'];
+  return {
+    id,
+    name: `数据线 ${sequence}`,
+    color: colors[(sequence - 1) % colors.length],
+    xMin: 0,
+    xMax: 100,
+    yMin: 0,
+    yMax: 100,
+    xAxis: null,
+    yAxis: null,
+    mode: 'box',
+    selectionBox: null,
+    points: []
+  };
+}
+
+/** 保存可撤销的当前数据线快照。 */
+function saveHistory() {
+  history.value.push(JSON.stringify(curves.value));
+  if (history.value.length > 50) history.value.shift();
+}
+
+/** 新增并激活一条独立数据线。 */
+function addCurve() {
+  saveHistory();
+  const id = Date.now();
+  curves.value.push(createCurve(id, curves.value.length + 1));
+  activeCurveId.value = id;
+  activeTool.value = 'box';
+}
+
+/** 删除指定数据线并切换到剩余数据线。 */
+function removeCurve(id) {
+  if (curves.value.length === 1) return;
+  saveHistory();
+  curves.value = curves.value.filter((curve) => curve.id !== id);
+  activeCurveId.value = curves.value[0].id;
+}
+
+/** 切换当前编辑的数据线并同步其选取方式。 */
+function selectCurve(id) {
+  activeCurveId.value = id;
+  const curve = curves.value.find((item) => item.id === id);
+  activeTool.value = curve?.mode || 'box';
+}
+
+/** 修改指定数据线字段并记录撤销快照。 */
+function updateCurve({ id, key, value }) {
+  const curve = curves.value.find((item) => item.id === id);
+  if (!curve || curve[key] === value) return;
+  saveHistory();
+  curve[key] = value;
+  if (key === 'mode') activeTool.value = value;
+}
+
+/** 切换画布工具，并在框选和描线工具间同步数据线模式。 */
+function activateTool(tool) {
+  activeTool.value = tool;
+  if ((tool === 'box' || tool === 'trace') && activeCurve.value && activeCurve.value.mode !== tool) {
+    updateCurve({ id: activeCurveId.value, key: 'mode', value: tool });
+  }
+}
+
+/** 从系统文件选择器导入一组图片。 */
 async function selectImages() {
   try {
     const selected = await recognitionApi.selectImages();
-    if (selected.length) store.commit('recognition/setImages', selected);
+    if (!selected.length) return;
+    store.commit('recognition/setImages', selected);
+    activeImageIndex.value = 0;
   } catch (error) {
     ElMessage.warning(error.message);
   }
 }
 
-/** 将当前图片队列提交给主进程识别服务。 */
-async function runRecognition() {
-  recognizing.value = true;
-  try {
-    const task = await recognitionApi.run({ images: images.value });
-    store.commit('recognition/setTask', task);
-    ElMessage.info(task.message);
-  } catch (error) {
-    ElMessage.error(error.message);
-  } finally {
-    recognizing.value = false;
-  }
+/** 撤销最近一次数据线配置或画布操作。 */
+function undo() {
+  const snapshot = history.value.pop();
+  if (!snapshot) return;
+  curves.value = JSON.parse(snapshot);
+  if (!curves.value.some((curve) => curve.id === activeCurveId.value)) activeCurveId.value = curves.value[0].id;
 }
 
-/** 清空当前导入图片和识别结果。 */
-function resetWorkspace() {
-  store.commit('recognition/reset');
+/** 清除当前数据线的选区和采样结果，保留轴标定配置。 */
+function clearActiveCurve() {
+  if (!activeCurve.value) return;
+  saveHistory();
+  activeCurve.value.points = [];
+  activeCurve.value.selectionBox = null;
+}
+
+/** 将图像像素点按用户标定的坐标轴换算成业务数据。 */
+function mapPoint(curve, point) {
+  const x = mapAxisValue(point, curve.xAxis, curve.xMin, curve.xMax, 'x');
+  const y = mapAxisValue(point, curve.yAxis, curve.yMin, curve.yMax, 'y');
+  return { curve: curve.name, x: formatNumber(x), y: formatNumber(y) };
+}
+
+/** 按坐标轴方向投影像素点并换算为数值。 */
+function mapAxisValue(point, axis, min, max, fallbackKey) {
+  if (!axis) return point[fallbackKey];
+  const vector = { x: axis.end.x - axis.start.x, y: axis.end.y - axis.start.y };
+  const lengthSquared = vector.x ** 2 + vector.y ** 2;
+  if (!lengthSquared) return min;
+  const ratio = ((point.x - axis.start.x) * vector.x + (point.y - axis.start.y) * vector.y) / lengthSquared;
+  return min + ratio * (max - min);
+}
+
+/** 输出便于查看和导出的有限精度数值。 */
+function formatNumber(value) {
+  return Number(Number(value).toFixed(6));
+}
+
+/** 将全部数据线结果导出为 XLSX 工作簿。 */
+function exportXlsx() {
+  if (!dataRows.value.length) {
+    ElMessage.warning('暂无可导出的数据');
+    return;
+  }
+  const worksheet = XLSX.utils.json_to_sheet(dataRows.value, { header: ['curve', 'x', 'y'] });
+  XLSX.utils.sheet_add_aoa(worksheet, [['数据线', 'X', 'Y']], { origin: 'A1' });
+  worksheet['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 16 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, '识别数据');
+  XLSX.writeFile(workbook, `VisionData-${Date.now()}.xlsx`);
 }
 </script>

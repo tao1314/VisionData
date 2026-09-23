@@ -30,7 +30,7 @@ button { font: inherit; }
 .title-bar__actions svg { width: 16px; }
 
 .app-body { display: flex; height: calc(100% - 52px); }
-.sidebar { position: relative; width: 220px; flex: none; background: white; border-right: 1px solid #e5eaf2; transition: width .2s; }
+.sidebar { position: relative; width: 64px; flex: none; background: white; border-right: 1px solid #e5eaf2; }
 .sidebar.collapsed { width: 64px; }
 .sidebar .el-menu { border-right: 0; padding-top: 12px; }
 .collapse-button { position: absolute; right: 12px; bottom: 14px; width: 36px; height: 36px; border: 1px solid #dce3ed; border-radius: 9px; background: white; cursor: pointer; }
@@ -61,8 +61,94 @@ button { font: inherit; }
 .fade-enter-active, .fade-leave-active { transition: opacity .15s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
+.recognition-workbench {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+  background: #e9eef5;
+}
+.result-pane {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  background: white;
+  border-right: 1px solid #dfe5ee;
+}
+.result-pane__content { min-height: 0; flex: 1; overflow: auto; }
+.curve-panel { padding: 20px 18px; }
+.panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.panel-title > div { display: grid; gap: 3px; }
+.panel-title strong { font-size: 17px; }
+.panel-title span { color: #8b96a7; font-size: 12px; }
+.panel-title .el-button--primary {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #fff !important;
+  --el-button-text-color: #fff;
+  --el-button-hover-text-color: #fff;
+  --el-button-active-text-color: #fff;
+}
+.panel-title .el-button--primary span,
+.panel-title .el-button--primary .el-icon { color: inherit; }
+.curve-tabs { display: flex; gap: 7px; padding-bottom: 12px; overflow-x: auto; }
+.curve-tabs button {
+  display: flex;
+  min-width: 118px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  color: #566174;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.curve-tabs button.active { border-color: #77a3ef; color: #265fbf; background: #eff5ff; box-shadow: 0 0 0 2px rgba(57, 118, 230, .08); }
+.curve-tabs i { width: 9px; height: 9px; flex: none; border-radius: 50%; }
+.curve-tabs span { overflow: hidden; flex: 1; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.curve-tabs b { display: grid; min-width: 22px; height: 20px; place-items: center; border-radius: 10px; background: rgba(19, 37, 68, .08); font-size: 11px; }
+.curve-form { padding-top: 14px; border-top: 1px solid #edf0f5; }
+.curve-form .el-form-item { margin-bottom: 14px; }
+.curve-form .el-form-item__label { color: #566174; font-size: 12px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-grid--name { grid-template-columns: minmax(0, 1fr) 68px; }
+.form-grid .el-input-number { width: 100%; }
+.axis-section { margin-bottom: 14px; padding: 12px; border: 1px solid #e5eaf1; border-radius: 9px; background: #fafbfd; }
+.axis-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.axis-heading strong { font-size: 13px; }
+.axis-section .el-form-item { margin-bottom: 4px; }
+.axis-section p { margin: 6px 0 0; color: #98a2b3; font-size: 11px; }
+.curve-summary { display: flex; align-items: center; justify-content: space-between; padding-top: 6px; color: #667085; font-size: 12px; }
+.curve-summary strong { color: #3976e6; font-size: 17px; }
+.result-actions { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 14px 16px; border-top: 1px solid #dfe5ee; background: #fbfcfe; box-shadow: 0 -5px 18px rgba(29, 45, 71, .04); }
+.result-actions > div { display: grid; }
+.result-actions > div strong { font-size: 19px; }
+.result-actions > div span { color: #8b96a7; font-size: 11px; }
+.result-actions .el-button + .el-button { margin-left: 0; }
+
+.image-pane { display: flex; min-width: 0; flex-direction: column; overflow: hidden; }
+.image-toolbar { display: flex; min-height: 62px; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #d9e0ea; background: white; }
+.tool-group { display: flex; align-items: center; gap: 8px; }
+.tool-group .el-button + .el-button { margin-left: 0; }
+.tool-group--right { margin-left: auto; }
+.image-selector { width: 210px; }
+.image-toolbar .el-divider--vertical { height: 28px; margin: 0 2px; }
+.image-stage { position: relative; min-height: 0; flex: 1; overflow: hidden; background-color: #d9e0e9; background-image: linear-gradient(45deg, rgba(255,255,255,.22) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.22) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,.22) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.22) 75%); background-position: 0 0, 0 10px, 10px -10px, -10px 0; background-size: 20px 20px; }
+.image-stage canvas { display: block; touch-action: none; }
+.image-stage.tool-box canvas { cursor: crosshair; }
+.image-stage.tool-trace canvas { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='%233976e6' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%233976e6'/%3E%3C/svg%3E") 12 12, crosshair; }
+.image-stage > .el-empty { position: absolute; inset: 0; margin: auto; }
+.stage-status { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 14px; padding: 7px 11px; border: 1px solid rgba(213, 221, 232, .85); border-radius: 7px; color: #5f6d80; background: rgba(255, 255, 255, .9); box-shadow: 0 3px 12px rgba(36, 51, 77, .08); font-size: 11px; backdrop-filter: blur(8px); pointer-events: none; }
+.el-dialog__footer { display: flex; align-items: center; justify-content: space-between; }
+
 @media (max-width: 1000px) {
   .page { padding: 22px; }
   .recognition-page .el-col { max-width: 100%; flex: 0 0 100%; }
   .workspace-card { min-height: auto; margin-bottom: 18px; }
+  .recognition-workbench { grid-template-columns: 330px minmax(620px, 1fr); overflow: auto; }
+  .tool-group--modes .el-button span { display: none; }
 }
