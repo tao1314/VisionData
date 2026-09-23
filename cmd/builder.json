@@ -1,0 +1,30 @@
+{
+  "productName": "VisionData 图数智取",
+  "appId": "com.visiondata.desktop",
+  "copyright": "Copyright © 2026",
+  "directories": {
+    "output": "out"
+  },
+  "asar": true,
+  "files": [
+    "electron/**/*",
+    "frontend/dist/**/*",
+    "package.json"
+  ],
+  "win": {
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

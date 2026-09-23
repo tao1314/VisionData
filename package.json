@@ -1,0 +1,26 @@
+{
+  "name": "vision-data",
+  "productName": "VisionData 图数智取",
+  "version": "0.1.0",
+  "description": "图片识别与结构化数据转换客户端",
+  "main": "electron/main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:frontend\" \"npm:dev:electron\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:electron": "wait-on tcp:10286 && cross-env APP_ENV=local electron .",
+    "build": "npm run build:frontend",
+    "build:frontend": "npm --prefix frontend run build",
+    "start": "cross-env APP_ENV=prod electron .",
+    "pack": "npm run build && electron-builder --dir --config cmd/builder.json",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --config cmd/builder.json"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.2"
+  }
+}
