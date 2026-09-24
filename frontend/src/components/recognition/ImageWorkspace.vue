@@ -30,7 +30,7 @@
 <script setup>
 /** 图片绘制、坐标轴标定、框选识别与吸附描线画布。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { extractCurvePath, findCurveSnap, mergeCurvePoints, pickColorProfile } from '@/utils/curveRecognition';
+import { CURVE_COLOR_TOLERANCE, extractCurvePath, findCurveSnap, mergeCurvePoints, pickColorProfile } from '@/utils/curveRecognition';
 
 const props = defineProps({
   image: { type: Object, default: null },
@@ -416,7 +416,7 @@ function handlePointerDown(event) {
       continuation.seedPoints,
       [],
       7,
-      activeCurve.value.recognitionTolerance ?? 18
+      CURVE_COLOR_TOLERANCE
     )
     : null;
   const points = firstSnap ? [firstSnap] : [];
@@ -455,7 +455,7 @@ function handlePointerMove(event) {
       [...drag.value.traceSeed, ...drag.value.points],
       drag.value.guidePoints,
       7,
-      activeCurve.value.recognitionTolerance ?? 18
+      CURVE_COLOR_TOLERANCE
     );
     if (!snapped) {
       draw();
@@ -490,7 +490,7 @@ function handlePointerUp(event) {
       state.current,
       getRecognitionColors(),
       260,
-      activeCurve.value.recognitionTolerance ?? 18
+      CURVE_COLOR_TOLERANCE
     );
     const result = appendBoxSegment(activeCurve.value, extractedPoints);
     emit('curve-change', { id: props.activeId, key: 'selectionBox', value: { start: state.start, end: state.current } });

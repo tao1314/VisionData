@@ -62,17 +62,6 @@
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="颜色容差">
-          <el-input-number
-            :model-value="activeCurve.recognitionTolerance ?? 18"
-            :min="5"
-            :max="50"
-            :step="1"
-            controls-position="right"
-            @update:model-value="update('recognitionTolerance', $event)"
-          />
-          <p class="recognition-help">数值越小颜色要求越严格；误识别多时建议降低。</p>
-        </el-form-item>
       </el-form>
 
       <div class="curve-summary">

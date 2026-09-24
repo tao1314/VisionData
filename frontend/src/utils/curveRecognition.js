@@ -1,6 +1,8 @@
 /** 曲线像素评分、连续路径搜索与结果清理工具。 */
 
 const REFERENCE_WHITE = { x: 95.047, y: 100, z: 108.883 };
+/** 曲线识别固定使用的 Lab 颜色距离容差。 */
+export const CURVE_COLOR_TOLERANCE = 12;
 
 /** 将十六进制颜色转换为 RGB。 */
 function hexToRgb(color) {
@@ -182,7 +184,7 @@ function groupCandidateColumns(columns, maxMissingColumns = 3) {
 }
 
 /** 在框选区域内按目标颜色提取一条满足阈值的连续曲线路径。 */
-export function extractCurvePath(imageData, start, end, targetColors, maxPoints = 260, tolerance = 22) {
+export function extractCurvePath(imageData, start, end, targetColors, maxPoints = 260, tolerance = CURVE_COLOR_TOLERANCE) {
   if (!imageData) return [];
   const left = Math.max(1, Math.round(Math.min(start.x, end.x)));
   const right = Math.min(imageData.width - 2, Math.round(Math.max(start.x, end.x)));
@@ -203,7 +205,7 @@ export function extractCurvePath(imageData, start, end, targetColors, maxPoints 
 }
 
 /** 在窄轨迹走廊内结合颜色、鼠标引导和前进方向寻找吸附点。 */
-export function findCurveSnap(imageData, point, targetColors, previousPoints = [], guidePoints = [], radius = 7, tolerance = 22) {
+export function findCurveSnap(imageData, point, targetColors, previousPoints = [], guidePoints = [], radius = 7, tolerance = CURVE_COLOR_TOLERANCE) {
   if (!imageData) return null;
   const targetLabs = createTargetLabs(targetColors);
   if (!targetLabs.length) return null;

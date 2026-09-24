@@ -115,7 +115,6 @@ function createCurve(id, sequence) {
     color: colors[(sequence - 1) % colors.length],
     targetColor: null,
     targetColors: [],
-    recognitionTolerance: 18,
     xMin: 0,
     xMax: 100,
     yMin: 0,
