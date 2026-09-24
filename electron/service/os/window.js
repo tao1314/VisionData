@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { BrowserWindow } = require('electron');
-const { getConfig } = require('../../config');
+const { getConfig, isProduction } = require('../../config');
 
 let mainWindow = null;
 
@@ -17,7 +17,7 @@ function createMainWindow() {
   mainWindow = new BrowserWindow(config.window);
   mainWindow.setMenuBarVisibility(false);
 
-  if (process.env.APP_ENV === 'prod') {
+  if (isProduction()) {
     mainWindow.loadFile(path.join(__dirname, '..', '..', '..', 'frontend', 'dist', 'index.html'));
   } else {
     mainWindow.loadURL(config.devServerUrl);

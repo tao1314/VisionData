@@ -41,10 +41,10 @@
           <el-tooltip content="沿曲线拖动，指针将吸附到附近边缘" placement="bottom">
             <el-button :type="activeTool === 'trace' ? 'primary' : ''" :icon="EditPen" @click="activateTool('trace')">吸附描线</el-button>
           </el-tooltip>
-          <el-tooltip content="标定 X 轴最小值到最大值的位置" placement="bottom">
+          <el-tooltip content="第一次点击确定 X 轴起点，第二次点击确定终点" placement="bottom">
             <el-button :type="activeTool === 'x-axis' ? 'primary' : ''" @click="activateTool('x-axis')">标注 X 轴</el-button>
           </el-tooltip>
-          <el-tooltip content="标定 Y 轴最小值到最大值的位置" placement="bottom">
+          <el-tooltip content="第一次点击确定 Y 轴起点，第二次点击确定终点" placement="bottom">
             <el-button :type="activeTool === 'y-axis' ? 'primary' : ''" @click="activateTool('y-axis')">标注 Y 轴</el-button>
           </el-tooltip>
         </div>

@@ -63,8 +63,8 @@ const toolHint = computed(() => ({
   box: '拖动框选曲线区域',
   trace: '按住并沿曲线描绘，自动吸附',
   'color-picker': '点击图片中的曲线拾取颜色',
-  'x-axis': '沿 X 轴从最小值拖至最大值',
-  'y-axis': '沿 Y 轴从最小值拖至最大值'
+  'x-axis': '第一次点击确定起点，第二次点击确定终点',
+  'y-axis': '第一次点击确定起点，第二次点击确定终点'
 }[props.tool] || '选择工具'));
 
 /** 加载当前图片并缓存像素数据供吸附算法使用。 */
@@ -387,6 +387,23 @@ function getRecognitionColors() {
   return [activeCurve.value?.targetColor || activeCurve.value?.color].filter(Boolean);
 }
 
+/** 判断当前工具是否为两次点击完成的坐标轴标注工具。 */
+function isAxisTool(tool) {
+  return tool === 'x-axis' || tool === 'y-axis';
+}
+
+/** 提交坐标轴终点，并恢复当前数据线的曲线选取工具。 */
+function completeAxisSelection(state, end) {
+  emit('curve-change', {
+    id: props.activeId,
+    key: state.tool === 'x-axis' ? 'xAxis' : 'yAxis',
+    value: { start: state.start, end }
+  });
+  drag.value = null;
+  emit('tool-complete', activeCurve.value.mode);
+  nextTick(draw);
+}
+
 /** 开始坐标轴、框选或吸附描线操作。 */
 function handlePointerDown(event) {
   if (!props.image || !activeCurve.value) return;
@@ -402,6 +419,20 @@ function handlePointerDown(event) {
     emit('curve-change', { id: props.activeId, key: 'targetColor', value: profile.color });
     emit('curve-change', { id: props.activeId, key: 'targetColors', value: profile.colors });
     emit('tool-complete', activeCurve.value.mode);
+    return;
+  }
+  if (isAxisTool(props.tool)) {
+    if (drag.value?.tool === props.tool && drag.value.awaitingSecondClick) {
+      completeAxisSelection(drag.value, point);
+    } else {
+      drag.value = {
+        tool: props.tool,
+        start: point,
+        current: point,
+        awaitingSecondClick: true
+      };
+      draw();
+    }
     return;
   }
   canvasRef.value.setPointerCapture(event.pointerId);
@@ -470,7 +501,7 @@ function handlePointerMove(event) {
   draw();
 }
 
-/** 完成当前操作并将结果提交给父组件。 */
+/** 处理指针松开，并提交仍采用拖动模式的操作结果。 */
 function handlePointerUp(event) {
   if (pan.value) {
     pan.value = null;
@@ -478,12 +509,13 @@ function handlePointerUp(event) {
     return;
   }
   if (!drag.value || !activeCurve.value) return;
+  if (isAxisTool(drag.value.tool) && drag.value.awaitingSecondClick) {
+    if (event?.pointerId !== undefined && canvasRef.value.hasPointerCapture(event.pointerId)) canvasRef.value.releasePointerCapture(event.pointerId);
+    return;
+  }
   const state = drag.value;
   drag.value = null;
-  if (state.tool === 'x-axis' || state.tool === 'y-axis') {
-    emit('curve-change', { id: props.activeId, key: state.tool === 'x-axis' ? 'xAxis' : 'yAxis', value: { start: state.start, end: state.current } });
-    emit('tool-complete', activeCurve.value.mode);
-  } else if (state.tool === 'box') {
+  if (state.tool === 'box') {
     const extractedPoints = extractCurvePath(
       sourcePixels,
       state.start,
@@ -510,7 +542,18 @@ function handlePointerUp(event) {
 }
 
 watch(() => props.image?.dataUrl, loadImage);
-watch(() => [props.curves, props.activeId, props.tool], draw, { deep: true });
+/** 数据线内容变化时重绘画布。 */
+watch(() => props.curves, draw, { deep: true });
+/** 切换数据线时取消尚未完成的两次点击标注。 */
+watch(() => props.activeId, () => {
+  drag.value = null;
+  draw();
+});
+/** 切换工具时清除不属于新工具的操作预览。 */
+watch(() => props.tool, (tool) => {
+  if (drag.value && drag.value.tool !== tool) drag.value = null;
+  draw();
+});
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(resizeCanvas);
