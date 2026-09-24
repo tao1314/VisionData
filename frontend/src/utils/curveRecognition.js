@@ -51,20 +51,34 @@ function readRgb(imageData, x, y) {
   };
 }
 
+/** 将 RGB 颜色转换为十六进制字符串。 */
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** 将单个或多个目标颜色转换为 Lab 样本集合。 */
+function createTargetLabs(targetColors) {
+  const colors = Array.isArray(targetColors) ? targetColors : [targetColors];
+  return colors.filter(Boolean).map((color) => rgbToLab(hexToRgb(color)));
+}
+
 /** 计算弱化明暗差异、强调色相一致性的感知颜色距离。 */
 function labDistance(first, second) {
   const firstChroma = Math.hypot(first.a, first.b);
   const secondChroma = Math.hypot(second.a, second.b);
   const lightnessDelta = first.l - second.l;
   const chromaDelta = firstChroma - secondChroma;
-  const hueDelta = Math.sqrt(Math.max(0, (first.a - second.a) ** 2 + (first.b - second.b) ** 2 - chromaDelta ** 2));
   if (secondChroma < 10) return Math.hypot(lightnessDelta * 0.55, first.a - second.a, first.b - second.b);
-  return Math.hypot(lightnessDelta * 0.18, chromaDelta * 0.25, hueDelta * 0.85);
+  if (firstChroma < 4) return 60 + Math.abs(lightnessDelta) * 0.2;
+  const cosine = Math.max(-1, Math.min(1, (first.a * second.a + first.b * second.b) / (firstChroma * secondChroma)));
+  const hueAngle = Math.acos(cosine);
+  return Math.hypot(lightnessDelta * 0.15, chromaDelta * 0.12, hueAngle * 45);
 }
 
-/** 计算像素与目标曲线颜色的距离。 */
-function colorDistance(imageData, x, y, targetLab) {
-  return labDistance(rgbToLab(readRgb(imageData, x, y)), targetLab);
+/** 计算像素与目标曲线颜色样本集合的最小距离。 */
+function colorDistance(imageData, x, y, targetLabs) {
+  const pixelLab = rgbToLab(readRgb(imageData, x, y));
+  return Math.min(...targetLabs.map((targetLab) => labDistance(pixelLab, targetLab)));
 }
 
 /** 计算像素周围的灰度梯度，作为弱线条特征。 */
@@ -76,20 +90,27 @@ function pixelGradient(imageData, x, y) {
 }
 
 /** 计算候选像素的数据代价，颜色为主、边缘为辅。 */
-function pixelCost(imageData, x, y, targetLab) {
-  return colorDistance(imageData, x, y, targetLab) - Math.min(pixelGradient(imageData, x, y), 120) * 0.035;
+function pixelCost(imageData, x, y, targetLabs, knownDistance = null) {
+  const distance = knownDistance ?? colorDistance(imageData, x, y, targetLabs);
+  return distance - Math.min(pixelGradient(imageData, x, y), 120) * 0.035;
 }
 
 /** 从单列中提取相互分离的低代价候选点。 */
-function collectColumnCandidates(imageData, x, top, bottom, targetLab, limit = 9) {
+function collectColumnCandidates(imageData, x, top, bottom, targetLabs, tolerance, limit = 9) {
   const candidates = [];
-  const costs = [];
+  const samples = [];
   for (let y = top; y <= bottom; y += 1) {
-    costs.push(pixelCost(imageData, x, y, targetLab));
+    const distance = colorDistance(imageData, x, y, targetLabs);
+    samples.push({
+      cost: pixelCost(imageData, x, y, targetLabs, distance),
+      distance
+    });
   }
-  for (let index = 0; index < costs.length; index += 1) {
-    const cost = costs[index];
-    if (cost <= (costs[index - 1] ?? cost) && cost <= (costs[index + 1] ?? cost)) {
+  for (let index = 0; index < samples.length; index += 1) {
+    const { cost, distance } = samples[index];
+    if (distance <= tolerance
+      && cost <= (samples[index - 1]?.cost ?? cost)
+      && cost <= (samples[index + 1]?.cost ?? cost)) {
       candidates.push({ x, y: top + index, dataCost: cost });
     }
   }
@@ -139,8 +160,29 @@ function smoothPath(points) {
   });
 }
 
-/** 在框选区域内按目标颜色提取一条连续曲线路径。 */
-export function extractCurvePath(imageData, start, end, targetColor, maxPoints = 260) {
+/** 将存在颜色候选的列按允许缺口拆分为连续列组。 */
+function groupCandidateColumns(columns, maxMissingColumns = 3) {
+  const groups = [];
+  let current = [];
+  let missingCount = 0;
+  for (const candidates of columns) {
+    if (candidates.length) {
+      if (missingCount > maxMissingColumns && current.length) {
+        groups.push(current);
+        current = [];
+      }
+      current.push(candidates);
+      missingCount = 0;
+    } else {
+      missingCount += 1;
+    }
+  }
+  if (current.length) groups.push(current);
+  return groups;
+}
+
+/** 在框选区域内按目标颜色提取一条满足阈值的连续曲线路径。 */
+export function extractCurvePath(imageData, start, end, targetColors, maxPoints = 260, tolerance = 22) {
   if (!imageData) return [];
   const left = Math.max(1, Math.round(Math.min(start.x, end.x)));
   const right = Math.min(imageData.width - 2, Math.round(Math.max(start.x, end.x)));
@@ -148,16 +190,23 @@ export function extractCurvePath(imageData, start, end, targetColor, maxPoints =
   const bottom = Math.min(imageData.height - 2, Math.round(Math.max(start.y, end.y)));
   if (right <= left || bottom <= top) return [];
   const step = Math.max(1, Math.ceil((right - left) / maxPoints));
-  const targetLab = rgbToLab(hexToRgb(targetColor));
+  const targetLabs = createTargetLabs(targetColors);
+  if (!targetLabs.length) return [];
   const columns = [];
-  for (let x = left; x <= right; x += step) columns.push(collectColumnCandidates(imageData, x, top, bottom, targetLab));
-  return smoothPath(findContinuousPath(columns));
+  for (let x = left; x <= right; x += step) {
+    columns.push(collectColumnCandidates(imageData, x, top, bottom, targetLabs, tolerance));
+  }
+  const groups = groupCandidateColumns(columns).filter((group) => group.length >= 3);
+  if (!groups.length) return [];
+  const longestGroup = groups.reduce((longest, group) => group.length > longest.length ? group : longest, []);
+  return smoothPath(findContinuousPath(longestGroup));
 }
 
 /** 在窄轨迹走廊内结合颜色、鼠标引导和前进方向寻找吸附点。 */
-export function findCurveSnap(imageData, point, targetColor, previousPoints = [], guidePoints = [], radius = 7) {
-  if (!imageData) return point;
-  const targetLab = rgbToLab(hexToRgb(targetColor));
+export function findCurveSnap(imageData, point, targetColors, previousPoints = [], guidePoints = [], radius = 7, tolerance = 22) {
+  if (!imageData) return null;
+  const targetLabs = createTargetLabs(targetColors);
+  if (!targetLabs.length) return null;
   const centerX = Math.round(point.x);
   const centerY = Math.round(point.y);
   const previous = previousPoints.at(-1);
@@ -168,12 +217,14 @@ export function findCurveSnap(imageData, point, targetColor, previousPoints = []
     ? { x: previous.x + guideDelta.x, y: previous.y + guideDelta.y }
     : previous;
   const allowedJump = guideDelta ? Math.max(radius * 1.6, Math.hypot(guideDelta.x, guideDelta.y) * 1.8 + 2) : radius * 1.6;
-  let best = point;
+  let best = null;
   let bestCost = Number.POSITIVE_INFINITY;
 
   for (let y = centerY - radius; y <= centerY + radius; y += 1) {
     for (let x = centerX - radius; x <= centerX + radius; x += 1) {
       if (x < 1 || y < 1 || x >= imageData.width - 1 || y >= imageData.height - 1) continue;
+      const distance = colorDistance(imageData, x, y, targetLabs);
+      if (distance > tolerance) continue;
       const pointerDistance = Math.hypot(x - centerX, y - centerY);
       const jumpDistance = previous ? Math.hypot(x - previous.x, y - previous.y) : 0;
       if (previous && jumpDistance > allowedJump) continue;
@@ -185,7 +236,7 @@ export function findCurveSnap(imageData, point, targetColor, previousPoints = []
         const expected = { x: previous.x - beforePrevious.x, y: previous.y - beforePrevious.y };
         directionPenalty += Math.hypot(x - previous.x - expected.x, y - previous.y - expected.y) * 0.85;
       }
-      const cost = pixelCost(imageData, x, y, targetLab) + pointerDistance * 1.25 + jumpDistance * 0.35 + directionPenalty;
+      const cost = pixelCost(imageData, x, y, targetLabs, distance) + pointerDistance * 1.25 + jumpDistance * 0.35 + directionPenalty;
       if (cost < bestCost) {
         bestCost = cost;
         best = { x, y };
@@ -195,11 +246,24 @@ export function findCurveSnap(imageData, point, targetColor, previousPoints = []
   return best;
 }
 
-/** 读取原图像素并返回颜色选择器可用的十六进制颜色。 */
-export function pickPixelColor(imageData, point) {
-  if (!imageData) return '#000000';
-  const { r, g, b } = readRgb(imageData, point.x, point.y);
-  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+/** 读取点击位置邻域，返回代表色和抗锯齿颜色样本。 */
+export function pickColorProfile(imageData, point, radius = 2) {
+  if (!imageData) return { color: '#000000', colors: ['#000000'] };
+  const center = readRgb(imageData, point.x, point.y);
+  const samples = [];
+  for (let y = Math.round(point.y) - radius; y <= Math.round(point.y) + radius; y += 1) {
+    for (let x = Math.round(point.x) - radius; x <= Math.round(point.x) + radius; x += 1) {
+      const rgb = readRgb(imageData, x, y);
+      samples.push({ rgb, distance: Math.hypot(rgb.r - center.r, rgb.g - center.g, rgb.b - center.b) });
+    }
+  }
+  samples.sort((first, second) => first.distance - second.distance);
+  const selected = samples.slice(0, Math.max(5, Math.ceil(samples.length * 0.45))).map((sample) => sample.rgb);
+  /** 计算一个 RGB 通道的中位数。 */
+  const medianChannel = (channel) => selected.map((rgb) => rgb[channel]).sort((a, b) => a - b)[Math.floor(selected.length / 2)];
+  const representative = { r: medianChannel('r'), g: medianChannel('g'), b: medianChannel('b') };
+  const colors = [...new Set([rgbToHex(representative), ...selected.map(rgbToHex)])].slice(0, 12);
+  return { color: colors[0], colors };
 }
 
 /** 合并新旧曲线点，按原图像素位置去重并保留原始描绘顺序。 */

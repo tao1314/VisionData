@@ -37,9 +37,7 @@
           <el-tooltip content="点击曲线拾取识别颜色" placement="bottom">
             <el-button :type="activeTool === 'color-picker' ? 'primary' : ''" :icon="Aim" @click="activateTool('color-picker')">吸管取色</el-button>
           </el-tooltip>
-          <el-tooltip content="拖动矩形区域自动提取曲线" placement="bottom">
-            <el-button :type="activeTool === 'box' ? 'primary' : ''" :icon="Crop" @click="activateTool('box')">框选</el-button>
-          </el-tooltip>
+          <!-- 框选识别暂时停用，保留底层实现便于后续恢复。 -->
           <el-tooltip content="沿曲线拖动，指针将吸附到附近边缘" placement="bottom">
             <el-button :type="activeTool === 'trace' ? 'primary' : ''" :icon="EditPen" @click="activateTool('trace')">吸附描线</el-button>
           </el-tooltip>
@@ -79,7 +77,7 @@
 <script setup>
 /** 图片取数工作台，负责数据线状态编排、坐标换算与结果导出。 */
 import { computed, ref } from 'vue';
-import { Aim, ArrowDown, Crop, Delete, Download, EditPen, RefreshLeft, Upload, View } from '@element-plus/icons-vue';
+import { Aim, ArrowDown, Delete, Download, EditPen, RefreshLeft, Upload, View } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx';
 import { useStore } from 'vuex';
@@ -91,7 +89,7 @@ import { recognitionApi } from '@/api/electron';
 const store = useStore();
 const activeImageIndex = ref(0);
 const activeCurveId = ref(1);
-const activeTool = ref('box');
+const activeTool = ref('trace');
 const previewVisible = ref(false);
 const history = ref([]);
 const curves = ref([createCurve(1, 1)]);
@@ -116,13 +114,15 @@ function createCurve(id, sequence) {
     name: `数据线 ${sequence}`,
     color: colors[(sequence - 1) % colors.length],
     targetColor: null,
+    targetColors: [],
+    recognitionTolerance: 18,
     xMin: 0,
     xMax: 100,
     yMin: 0,
     yMax: 100,
     xAxis: null,
     yAxis: null,
-    mode: 'box',
+    mode: 'trace',
     selectionBox: null,
     segments: [],
     points: []
@@ -141,7 +141,7 @@ function addCurve() {
   const id = Date.now();
   curves.value.push(createCurve(id, curves.value.length + 1));
   activeCurveId.value = id;
-  activeTool.value = 'box';
+  activeTool.value = 'trace';
 }
 
 /** 删除指定数据线并切换到剩余数据线。 */
@@ -156,7 +156,7 @@ function removeCurve(id) {
 function selectCurve(id) {
   activeCurveId.value = id;
   const curve = curves.value.find((item) => item.id === id);
-  activeTool.value = curve?.mode || 'box';
+  activeTool.value = curve?.mode || 'trace';
 }
 
 /** 修改指定数据线字段并记录撤销快照。 */
@@ -165,6 +165,7 @@ function updateCurve({ id, key, value }) {
   if (!curve || curve[key] === value) return;
   saveHistory();
   curve[key] = value;
+  if (key === 'targetColor') curve.targetColors = value ? [value] : [];
   if (key === 'mode') activeTool.value = value;
 }
 

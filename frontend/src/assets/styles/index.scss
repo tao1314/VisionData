@@ -64,14 +64,18 @@ button { font: inherit; }
 .recognition-workbench {
   display: grid;
   grid-template-columns: 380px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
+  min-height: 0;
   overflow: hidden;
   background: #e9eef5;
 }
 .result-pane {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   background: white;
   border-right: 1px solid #dfe5ee;
 }
@@ -114,6 +118,7 @@ button { font: inherit; }
 .curve-form { padding-top: 14px; border-top: 1px solid #edf0f5; }
 .curve-form .el-form-item { margin-bottom: 14px; }
 .curve-form .el-form-item__label { color: #566174; font-size: 12px; }
+.curve-form .recognition-help { margin: 5px 0 0 10px; color: #98a2b3; font-size: 11px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .form-grid--colors { grid-template-columns: minmax(0, 1fr) 68px 68px; }
 .form-grid .el-input-number { width: 100%; }
@@ -124,7 +129,7 @@ button { font: inherit; }
 .axis-section p { margin: 6px 0 0; color: #98a2b3; font-size: 11px; }
 .curve-summary { display: flex; align-items: center; justify-content: space-between; padding-top: 6px; color: #667085; font-size: 12px; }
 .curve-summary strong { color: #3976e6; font-size: 17px; }
-.result-actions { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 14px 16px; border-top: 1px solid #dfe5ee; background: #fbfcfe; box-shadow: 0 -5px 18px rgba(29, 45, 71, .04); }
+.result-actions { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto auto; flex: none; gap: 8px; align-items: center; padding: 14px 16px; border-top: 1px solid #dfe5ee; background: #fbfcfe; box-shadow: 0 -5px 18px rgba(29, 45, 71, .04); }
 .result-actions > div { display: grid; }
 .result-actions > div strong { font-size: 19px; }
 .result-actions > div span { color: #8b96a7; font-size: 11px; }
@@ -133,7 +138,7 @@ button { font: inherit; }
 .result-actions .el-dropdown .el-button--primary span,
 .result-actions .el-dropdown .el-button--primary .el-icon { color: #fff !important; }
 
-.image-pane { display: flex; min-width: 0; flex-direction: column; overflow: hidden; }
+.image-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; }
 .image-toolbar { display: flex; min-height: 62px; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #d9e0ea; background: white; }
 .tool-group { display: flex; align-items: center; gap: 8px; }
 .tool-group .el-button + .el-button { margin-left: 0; }

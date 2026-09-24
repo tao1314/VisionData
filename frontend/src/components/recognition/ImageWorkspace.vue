@@ -30,13 +30,13 @@
 <script setup>
 /** 图片绘制、坐标轴标定、框选识别与吸附描线画布。 */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { extractCurvePath, findCurveSnap, mergeCurvePoints, pickPixelColor } from '@/utils/curveRecognition';
+import { extractCurvePath, findCurveSnap, mergeCurvePoints, pickColorProfile } from '@/utils/curveRecognition';
 
 const props = defineProps({
   image: { type: Object, default: null },
   curves: { type: Array, required: true },
   activeId: { type: Number, required: true },
-  tool: { type: String, default: 'box' }
+  tool: { type: String, default: 'trace' }
 });
 
 const emit = defineEmits(['curve-change', 'tool-complete']);
@@ -381,6 +381,12 @@ function isEditableElement(target) {
     && (target.matches('input, textarea, [contenteditable="true"]') || Boolean(target.closest('[contenteditable="true"]')));
 }
 
+/** 获取当前数据线的多像素识别颜色样本。 */
+function getRecognitionColors() {
+  if (activeCurve.value?.targetColors?.length) return activeCurve.value.targetColors;
+  return [activeCurve.value?.targetColor || activeCurve.value?.color].filter(Boolean);
+}
+
 /** 开始坐标轴、框选或吸附描线操作。 */
 function handlePointerDown(event) {
   if (!props.image || !activeCurve.value) return;
@@ -392,7 +398,9 @@ function handlePointerDown(event) {
   }
   const point = toImagePoint(event);
   if (props.tool === 'color-picker') {
-    emit('curve-change', { id: props.activeId, key: 'targetColor', value: pickPixelColor(sourcePixels, point) });
+    const profile = pickColorProfile(sourcePixels, point);
+    emit('curve-change', { id: props.activeId, key: 'targetColor', value: profile.color });
+    emit('curve-change', { id: props.activeId, key: 'targetColors', value: profile.colors });
     emit('tool-complete', activeCurve.value.mode);
     return;
   }
@@ -400,9 +408,18 @@ function handlePointerDown(event) {
   const continuation = props.tool === 'trace'
     ? getTraceContinuation(point)
     : { mode: 'replace', basePoints: [], seedPoints: [] };
-  const points = props.tool === 'trace'
-    ? [findCurveSnap(sourcePixels, point, activeCurve.value.targetColor || activeCurve.value.color, continuation.seedPoints)]
-    : [];
+  const firstSnap = props.tool === 'trace'
+    ? findCurveSnap(
+      sourcePixels,
+      point,
+      getRecognitionColors(),
+      continuation.seedPoints,
+      [],
+      7,
+      activeCurve.value.recognitionTolerance ?? 18
+    )
+    : null;
+  const points = firstSnap ? [firstSnap] : [];
   drag.value = {
     tool: props.tool,
     start: point,
@@ -434,10 +451,16 @@ function handlePointerMove(event) {
     const snapped = findCurveSnap(
       sourcePixels,
       point,
-      activeCurve.value.targetColor || activeCurve.value.color,
+      getRecognitionColors(),
       [...drag.value.traceSeed, ...drag.value.points],
-      drag.value.guidePoints
+      drag.value.guidePoints,
+      7,
+      activeCurve.value.recognitionTolerance ?? 18
     );
+    if (!snapped) {
+      draw();
+      return;
+    }
     const previous = drag.value.points.at(-1);
     if (!previous || Math.hypot(snapped.x - previous.x, snapped.y - previous.y) >= 2) {
       drag.value.points.push(snapped);
@@ -465,7 +488,9 @@ function handlePointerUp(event) {
       sourcePixels,
       state.start,
       state.current,
-      activeCurve.value.targetColor || activeCurve.value.color
+      getRecognitionColors(),
+      260,
+      activeCurve.value.recognitionTolerance ?? 18
     );
     const result = appendBoxSegment(activeCurve.value, extractedPoints);
     emit('curve-change', { id: props.activeId, key: 'selectionBox', value: { start: state.start, end: state.current } });
@@ -475,7 +500,7 @@ function handlePointerUp(event) {
       key: 'points',
       value: result.points
     });
-  } else if (state.tool === 'trace') {
+  } else if (state.tool === 'trace' && state.points.length) {
     const segments = mergeTraceSegments(state);
     emit('curve-change', { id: props.activeId, key: 'segments', value: segments });
     emit('curve-change', { id: props.activeId, key: 'points', value: flattenCurveSegments(segments) });

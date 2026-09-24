@@ -57,9 +57,21 @@
 
         <el-form-item label="曲线选取方式">
           <el-radio-group :model-value="activeCurve.mode" @update:model-value="update('mode', $event)">
-            <el-radio-button value="box">框选识别</el-radio-button>
+            <!-- 框选识别暂时停用，保留底层实现便于后续恢复。 -->
             <el-radio-button value="trace">吸附描线</el-radio-button>
           </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="颜色容差">
+          <el-input-number
+            :model-value="activeCurve.recognitionTolerance ?? 18"
+            :min="5"
+            :max="50"
+            :step="1"
+            controls-position="right"
+            @update:model-value="update('recognitionTolerance', $event)"
+          />
+          <p class="recognition-help">数值越小颜色要求越严格；误识别多时建议降低。</p>
         </el-form-item>
       </el-form>
 
