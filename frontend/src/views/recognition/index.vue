@@ -14,7 +14,15 @@
       <footer class="result-actions">
         <div><strong>{{ dataRows.length }}</strong><span>数据点</span></div>
         <el-button :disabled="!dataRows.length" @click="previewVisible = true"><View />查看数据</el-button>
-        <el-button type="primary" :disabled="!dataRows.length" @click="exportXlsx"><Download />导出数据</el-button>
+        <el-dropdown :disabled="!dataRows.length" @command="exportXlsx">
+          <el-button type="primary" :disabled="!dataRows.length"><Download />导出数据<el-icon><ArrowDown /></el-icon></el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="active" :disabled="!activeCurve?.points.length">仅导出当前数据线</el-dropdown-item>
+              <el-dropdown-item command="all">导出全部数据线</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </footer>
     </aside>
 
@@ -26,6 +34,9 @@
           </el-select>
         </div>
         <div class="tool-group tool-group--modes">
+          <el-tooltip content="点击曲线拾取识别颜色" placement="bottom">
+            <el-button :type="activeTool === 'color-picker' ? 'primary' : ''" :icon="Aim" @click="activateTool('color-picker')">吸管取色</el-button>
+          </el-tooltip>
           <el-tooltip content="拖动矩形区域自动提取曲线" placement="bottom">
             <el-button :type="activeTool === 'box' ? 'primary' : ''" :icon="Crop" @click="activateTool('box')">框选</el-button>
           </el-tooltip>
@@ -56,14 +67,19 @@
       />
     </main>
 
-    <DataPreviewDialog v-model="previewVisible" :rows="dataRows" @export="exportXlsx" />
+    <DataPreviewDialog
+      v-model="previewVisible"
+      :groups="dataGroups"
+      :active-id="activeCurveId"
+      @export="exportXlsx"
+    />
   </section>
 </template>
 
 <script setup>
 /** 图片取数工作台，负责数据线状态编排、坐标换算与结果导出。 */
 import { computed, ref } from 'vue';
-import { Crop, Delete, Download, EditPen, RefreshLeft, Upload, View } from '@element-plus/icons-vue';
+import { Aim, ArrowDown, Crop, Delete, Download, EditPen, RefreshLeft, Upload, View } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import * as XLSX from 'xlsx';
 import { useStore } from 'vuex';
@@ -83,6 +99,14 @@ const images = computed(() => store.state.recognition.images);
 const activeImage = computed(() => images.value[activeImageIndex.value] || null);
 const activeCurve = computed(() => curves.value.find((curve) => curve.id === activeCurveId.value));
 const dataRows = computed(() => curves.value.flatMap((curve) => curve.points.map((point) => mapPoint(curve, point))));
+/** 按数据线生成相互独立的预览数据组。 */
+const dataGroups = computed(() => curves.value
+  .filter((curve) => curve.points.length)
+  .map((curve) => ({
+    id: curve.id,
+    name: curve.name,
+    rows: curve.points.map((point) => mapPoint(curve, point))
+  })));
 
 /** 创建一条包含默认轴范围的空数据线。 */
 function createCurve(id, sequence) {
@@ -91,6 +115,7 @@ function createCurve(id, sequence) {
     id,
     name: `数据线 ${sequence}`,
     color: colors[(sequence - 1) % colors.length],
+    targetColor: null,
     xMin: 0,
     xMax: 100,
     yMin: 0,
@@ -99,6 +124,7 @@ function createCurve(id, sequence) {
     yAxis: null,
     mode: 'box',
     selectionBox: null,
+    segments: [],
     points: []
   };
 }
@@ -175,6 +201,7 @@ function clearActiveCurve() {
   if (!activeCurve.value) return;
   saveHistory();
   activeCurve.value.points = [];
+  activeCurve.value.segments = [];
   activeCurve.value.selectionBox = null;
 }
 
@@ -200,17 +227,57 @@ function formatNumber(value) {
   return Number(Number(value).toFixed(6));
 }
 
-/** 将全部数据线结果导出为 XLSX 工作簿。 */
-function exportXlsx() {
-  if (!dataRows.value.length) {
+/** 生成合法且不重复的 Excel 工作表名称。 */
+function createWorksheetName(curve, index, usedNames) {
+  const fallback = `数据线 ${index + 1}`;
+  const base = String(curve.name || fallback).replace(/[:\\/?*[\]]/g, '_').slice(0, 31) || fallback;
+  let name = base;
+  let sequence = 2;
+  while (usedNames.has(name)) {
+    const suffix = `-${sequence}`;
+    name = `${base.slice(0, 31 - suffix.length)}${suffix}`;
+    sequence += 1;
+  }
+  usedNames.add(name);
+  return name;
+}
+
+/** 将当前时间格式化为文件名使用的年月日时分秒。 */
+function formatExportDateTime(date = new Date()) {
+  /** 为单个日期数字补齐两位。 */
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}：${pad(date.getMinutes())}：${pad(date.getSeconds())}`;
+}
+
+/** 替换 Windows 文件名不允许使用的字符。 */
+function sanitizeFileName(name) {
+  return String(name || '数据线').replace(/[<>:"/\\|?*]/g, '_').trim() || '数据线';
+}
+
+/** 按当前数据线或全部数据线分别导出 XLSX 工作表。 */
+function exportXlsx(options = 'active') {
+  const scope = typeof options === 'string' ? options : options.scope;
+  const requestedCurveId = typeof options === 'object' ? options.curveId : activeCurveId.value;
+  const selectedCurves = scope === 'all'
+    ? curves.value.filter((curve) => curve.points.length)
+    : curves.value.filter((curve) => curve.id === requestedCurveId && curve.points.length);
+  if (!selectedCurves.length) {
     ElMessage.warning('暂无可导出的数据');
     return;
   }
-  const worksheet = XLSX.utils.json_to_sheet(dataRows.value, { header: ['curve', 'x', 'y'] });
-  XLSX.utils.sheet_add_aoa(worksheet, [['数据线', 'X', 'Y']], { origin: 'A1' });
-  worksheet['!cols'] = [{ wch: 24 }, { wch: 16 }, { wch: 16 }];
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, '识别数据');
-  XLSX.writeFile(workbook, `VisionData-${Date.now()}.xlsx`);
+  const usedNames = new Set();
+  selectedCurves.forEach((curve, index) => {
+    const rows = curve.points.map((point) => {
+      const mapped = mapPoint(curve, point);
+      return { x: mapped.x, y: mapped.y };
+    });
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: ['x', 'y'] });
+    XLSX.utils.sheet_add_aoa(worksheet, [['X', 'Y']], { origin: 'A1' });
+    worksheet['!cols'] = [{ wch: 16 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(workbook, worksheet, createWorksheetName(curve, index, usedNames));
+  });
+  const prefix = scope === 'all' ? '全部数据' : sanitizeFileName(selectedCurves[0].name);
+  XLSX.writeFile(workbook, `${prefix}${formatExportDateTime()}.xlsx`);
 }
 </script>

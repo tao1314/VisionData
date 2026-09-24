@@ -115,7 +115,7 @@ button { font: inherit; }
 .curve-form .el-form-item { margin-bottom: 14px; }
 .curve-form .el-form-item__label { color: #566174; font-size: 12px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.form-grid--name { grid-template-columns: minmax(0, 1fr) 68px; }
+.form-grid--colors { grid-template-columns: minmax(0, 1fr) 68px 68px; }
 .form-grid .el-input-number { width: 100%; }
 .axis-section { margin-bottom: 14px; padding: 12px; border: 1px solid #e5eaf1; border-radius: 9px; background: #fafbfd; }
 .axis-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -129,6 +129,9 @@ button { font: inherit; }
 .result-actions > div strong { font-size: 19px; }
 .result-actions > div span { color: #8b96a7; font-size: 11px; }
 .result-actions .el-button + .el-button { margin-left: 0; }
+.result-actions .el-dropdown .el-button--primary,
+.result-actions .el-dropdown .el-button--primary span,
+.result-actions .el-dropdown .el-button--primary .el-icon { color: #fff !important; }
 
 .image-pane { display: flex; min-width: 0; flex-direction: column; overflow: hidden; }
 .image-toolbar { display: flex; min-height: 62px; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #d9e0ea; background: white; }
@@ -140,9 +143,17 @@ button { font: inherit; }
 .image-stage { position: relative; min-height: 0; flex: 1; overflow: hidden; background-color: #d9e0e9; background-image: linear-gradient(45deg, rgba(255,255,255,.22) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.22) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, rgba(255,255,255,.22) 75%), linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.22) 75%); background-position: 0 0, 0 10px, 10px -10px, -10px 0; background-size: 20px 20px; }
 .image-stage canvas { display: block; touch-action: none; }
 .image-stage.tool-box canvas { cursor: crosshair; }
+.image-stage.tool-color-picker canvas { cursor: copy; }
 .image-stage.tool-trace canvas { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='%233976e6' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%233976e6'/%3E%3C/svg%3E") 12 12, crosshair; }
 .image-stage > .el-empty { position: absolute; inset: 0; margin: auto; }
-.stage-status { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 14px; padding: 7px 11px; border: 1px solid rgba(213, 221, 232, .85); border-radius: 7px; color: #5f6d80; background: rgba(255, 255, 255, .9); box-shadow: 0 3px 12px rgba(36, 51, 77, .08); font-size: 11px; backdrop-filter: blur(8px); pointer-events: none; }
+.image-stage-footer { position: absolute; right: 0; bottom: 0; left: 0; display: flex; height: 50px; align-items: center; gap: 16px; padding: 8px 14px; border-top: 1px solid #d9e0ea; background: #fff; }
+.zoom-controls { display: flex; flex: none; align-items: center; gap: 6px; }
+.zoom-controls span { min-width: 48px; color: #475467; font-size: 12px; text-align: center; }
+.zoom-controls .el-button + .el-button { margin-left: 0; }
+.stage-status { display: flex; min-width: 0; flex: 1; justify-content: flex-end; gap: 14px; overflow: hidden; color: #5f6d80; font-size: 11px; pointer-events: none; }
+.stage-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-curve-switcher { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #566174; font-size: 13px; }
+.preview-curve-switcher .el-select { width: 280px; }
 .el-dialog__footer { display: flex; align-items: center; justify-content: space-between; }
 
 @media (max-width: 1000px) {

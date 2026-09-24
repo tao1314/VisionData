@@ -23,7 +23,7 @@
 
     <template v-if="activeCurve">
       <el-form label-position="top" class="curve-form">
-        <div class="form-grid form-grid--name">
+        <div class="form-grid form-grid--colors">
           <el-form-item label="数据线名称">
             <el-input v-model="activeName" clearable maxlength="30" placeholder="请输入数据线名称">
               <template #prefix><el-icon><EditPen /></el-icon></template>
@@ -31,6 +31,9 @@
           </el-form-item>
           <el-form-item label="标注颜色">
             <el-color-picker :model-value="activeCurve.color" @update:model-value="update('color', $event)" />
+          </el-form-item>
+          <el-form-item label="识别颜色">
+            <el-color-picker :model-value="activeCurve.targetColor || activeCurve.color" @update:model-value="update('targetColor', $event)" />
           </el-form-item>
         </div>
 

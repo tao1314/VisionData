@@ -5,9 +5,9 @@
       <span>VisionData 图数智取</span>
     </div>
     <div class="title-bar__actions">
-      <button aria-label="最小化" @click="windowApi.minimize()"><Minus /></button>
-      <button aria-label="最大化" @click="windowApi.toggleMaximize()"><FullScreen /></button>
-      <button class="danger" aria-label="关闭" @click="windowApi.close()"><Close /></button>
+      <button aria-label="最小化" @mousedown.prevent @click="windowApi.minimize()"><Minus /></button>
+      <button aria-label="最大化" @mousedown.prevent @click="windowApi.toggleMaximize()"><FullScreen /></button>
+      <button class="danger" aria-label="关闭" @mousedown.prevent @click="windowApi.close()"><Close /></button>
     </div>
   </header>
 </template>
