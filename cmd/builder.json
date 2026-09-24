@@ -12,6 +12,7 @@
     "package.json"
   ],
   "win": {
+    "icon": "build/icons/icon.png",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "target": [
       {

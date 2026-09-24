@@ -14,7 +14,7 @@
     "build:frontend": "npm --prefix frontend run build",
     "start": "cross-env APP_ENV=prod electron .",
     "pack": "npm run build && electron-builder --dir --config cmd/builder.json",
-    "dist:win": "npm run build && electron-builder --win nsis --x64 --config cmd/builder.json"
+    "build-w": "npm run build && electron-builder --win nsis --x64 --config cmd/builder.json"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
